@@ -13,9 +13,8 @@ L'architecture repose sur une approche hybride combinant une **analyse cinémati
 2. **Installation des dépendances** :
    ```bash
    pip install -r requirements.txt
-   
-   
-   
+
+
 ## Architecture & Méthodologie
 
 Le cœur du projet réside dans la traduction de données de position brutes (x,y) en signatures physiques interprétables.
@@ -79,6 +78,38 @@ Le module main.py inclut un moteur de rendu Matplotlib qui superpose les événe
 Lignes Vertes : Frappes (Hits) détectées par rupture de flux.
 
 Lignes Rouges : Rebonds (Bounces) détectés par signature verticale.
+
+
+## Workflow & Utilisation des Fichiers
+Ce projet fonctionne en deux phases distinctes (Entraînement et Inférence) :
+
+1. Entraînement (train_model.py)
+
+Ce script est responsable de la création du "cerveau" du système.
+
+Entrée : Une liste de fichiers JSON annotés (ex: ball_data_1.json, etc.).
+
+Processus : Il extrait les features cinématiques, gère le déséquilibre des classes, entraîne le Random Forest et affiche le rapport de performance (Précision/Rappel).
+
+Sortie : Il génère le fichier binaire trained_model_rf.joblib.
+
+2. Inférence & Analyse (main.py)
+
+Ce script est utilisé pour analyser un nouveau match.
+
+Fonction unsupervised_hit_bounce_detection : Exécute l'analyse purement physique (sans ML) et affiche les graphiques.
+
+Fonction supervized_hit_bounce_detection : Charge le modèle ML pour prédire les événements frame par frame.
+
+Sortie : Visualisation Matplotlib et logs de détection.
+
+## Le fichier .joblib (Modèle Sérialisé)
+
+Le fichier trained_model_rf.joblib contient le classifieur Random Forest entraîné et gelé. Il permet de faire des prédictions sans avoir à ré-entraîner le modèle à chaque fois.
+
+Comment s'en servir dans un autre script ?
+
+Pour utiliser ce modèle, vous devez impérativement lui fournir les mêmes features que celles utilisées lors de l'entraînement (Vitesse, Accélération, Lag, Lead, etc.).
 
  **Structure du Projet**
  
