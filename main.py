@@ -18,16 +18,13 @@ def unsupervised_hit_bounce_detection(json_file_path):
     """
     Pipeline de détection non-supervisée basée sur la cinématique.
     
-    Approche :
-    1. Prétraitement du signal (Interpolation & Lissage Savitzky-Golay).
-    2. Calcul des dérivées physiques (Vitesse, Accélération, Jerk).
-    3. Arbre de décision heuristique basé sur la signature physique des impacts.
+    Retourne le dictionnaire original enrichi avec 'pred_action'.
     
     Args:
         json_file_path (str): Chemin du fichier de tracking brut.
         
     Returns:
-        tuple: (liste_hits, liste_bounces) - Indices des événements détectés.
+        dict: Dictionnaire complet {frame_id: {'x':..., 'y':..., 'visible':..., 'pred_action':...}}
     """
     
     print(f"\n{'='*60}")
@@ -40,7 +37,7 @@ def unsupervised_hit_bounce_detection(json_file_path):
     # ---------------------------------------------------------
     if not os.path.exists(json_file_path):
         print(f"[ERREUR] Le fichier {json_file_path} est introuvable.")
-        return [], []
+        return {}
 
     with open(json_file_path, 'r') as m:
         data = json.load(m)
@@ -58,7 +55,7 @@ def unsupervised_hit_bounce_detection(json_file_path):
         else:
             total_frames += 1
     
-    ratio = count_invisible/total_frames
+    ratio = count_invisible/total_frames if total_frames > 0 else 0
     print(f"[*] Qualité du signal : {100-ratio*100:.2f}% de frames visibles.")
     
     # --- Standardisation des données ---
@@ -83,8 +80,7 @@ def unsupervised_hit_bounce_detection(json_file_path):
     X_arr = np.array(X_propres)
     Y_arr = np.array(Y_propres)
 
-    # Application d'un filtre Savitzky-Golay :
-    # Choix stratégique vs Moyenne mobile : préserve mieux l'amplitude des pics (impacts brefs)
+    # Application d'un filtre Savitzky-Golay
     X_smooth = savgol_filter(X_arr, window_length=7, polyorder=2)
     Y_smooth = savgol_filter(Y_arr, window_length=7, polyorder=2)
 
@@ -105,14 +101,12 @@ def unsupervised_hit_bounce_detection(json_file_path):
     # ---------------------------------------------------------
     # 4. DÉTECTION DES PICS CANDIDATS
     # ---------------------------------------------------------
-    # Identification des changements brusques de mouvement via proéminence des pics
     pics_indices, _ = find_peaks(acc_totale2, prominence=1.3)
     print(f"[*] Candidats détectés (pics d'accélération) : {len(pics_indices)}")
 
     # ---------------------------------------------------------
     # 5. FILTRE DE DÉBUT ET FIN DE JEU
     # ---------------------------------------------------------
-    # Exclusion des mouvements parasites avant/après le jeu effectif
     vitesse_mag = np.sqrt(vx2**2 + vy2**2)
     seuil_mouvement = 0.5 
     indices_mouvement = np.where(vitesse_mag > seuil_mouvement)[0]
@@ -132,84 +126,62 @@ def unsupervised_hit_bounce_detection(json_file_path):
     
     LARGE_WINDOW = 2
     last_event_type = None 
-    
     last_hit_frame_idx = -999 
-    MIN_FRAMES_ENTRE_HITS = 10 # Cooldown temporel (~0.3s) pour éviter les doubles détections
+    MIN_FRAMES_ENTRE_HITS = 10 
 
     for i in pics_indices:
-        # A. Filtrage Temporel (Hors zone de jeu active)
+        # A. Filtrage Temporel
         if i < start_game_idx or i > end_game_idx:
             continue
             
         frame_idx_str = frames[i]
         frame_idx_int = int(frame_idx_str)
         
-        # Protection contre les effets de bord du tableau
+        # Protection bords
         if i < 4 or i > len(frames) - 5:
             continue
 
-        # B. Analyse Vectorielle (Moyenne lissée sur 3 frames)
+        # B. Analyse Vectorielle
         v_in_x = np.mean(vx2[i-3:i])
         v_in_y = np.mean(vy2[i-3:i])
-        
         v_out_x = np.mean(vx2[i+1:i+4])
         v_out_y = np.mean(vy2[i+1:i+4])
         
-        # Détection de changement de sens
         changement_direction_x = (np.sign(v_in_x) != np.sign(v_out_x))
-        
-        # C. Produit Scalaire
-        # < 0 implique un angle > 90° (choc violent / raquette)
         dot_product = (v_in_x * v_out_x) + (v_in_y * v_out_y)
         
-        # D. Analyse Topologique (Trajectoire Y)
-        # Vérification des extrema locaux sur l'axe profondeur
-        is_local_y_max = (Y_smooth[i] > Y_smooth[i-1]) and (Y_smooth[i] > Y_smooth[i+1])
-        is_local_y_min = (Y_smooth[i] < Y_smooth[i-1]) and (Y_smooth[i] < Y_smooth[i+1])
-        is_local_extremun = is_local_y_max or is_local_y_min 
-        
-        # E. Analyse Topologique Globale (Fenêtre élargie)
+        # D. Analyse Topologique
         y_window = Y_smooth[i - LARGE_WINDOW : i + LARGE_WINDOW + 1]
         valeur_actuelle = Y_smooth[i]
         is_global_max = valeur_actuelle == np.max(y_window)
         is_global_min = valeur_actuelle == np.min(y_window)
         is_extremum_trajectory = is_global_max or is_global_min
         
-        # F. Analyse des Forces (Composantes du vecteur accélération)
+        # F. Analyse des Forces
         force_choc = acc_totale2[i]
         acc_x = abs(ax2[i])
         acc_y = abs(ay2[i])
-        
-        # Ratio vertical : Discrimine le rebond (choc purement Y) de la frappe (choc X+Y)
         ratio_vertical = acc_y / (force_choc + 0.00001)
-        
         
         # --- ARBRE DE DÉCISION ---
 
-        # BRANCHE 1 : DÉTECTION DE FRAPPE (HIT)
-        # Critères : Inversion vectorielle violente OU extremum de trajectoire marqué OU changement de direction selon x
+        # CAS 1 : HIT
         if (dot_product < 0 and force_choc > 4 ) or is_extremum_trajectory or changement_direction_x:
             ecart_frames = frame_idx_int - last_hit_frame_idx
-                
             if ecart_frames > MIN_FRAMES_ENTRE_HITS:
                 hits.append(frame_idx_str) 
                 last_event_type = 'hit'
                 last_hit_frame_idx = frame_idx_int 
             else:
-                # Suppression des doublons rapprochés
                 continue
             
-
-        # BRANCHE 2 : DÉTECTION DE REBOND (BOUNCE)
+        # CAS 2 : BOUNCE
         else:
-            # Critères : Accélération majoritairement verticale & conservation du sens latéral
             is_vertical_shock = ratio_vertical > 0.75
             stable_x_direction = (v_in_x * v_out_x) > 0
             
             if is_vertical_shock and stable_x_direction:
-                # Seuil de force relaxé pour les rebonds
                 if force_choc > 2.1: 
-                    # Logique séquentielle : Impossible d'avoir 2 bounces de suite
                     if last_event_type == 'bounce':
                         continue 
                     else:
@@ -217,28 +189,32 @@ def unsupervised_hit_bounce_detection(json_file_path):
                         last_event_type = 'bounce'
 
     # ---------------------------------------------------------
-    # 7. VISUALISATION (DEBUG)
+    # 7. ENRICHISSEMENT DU DICTIONNAIRE DE RETOUR
+    # ---------------------------------------------------------
+    # On ajoute la colonne 'pred_action' au dictionnaire existant
+    for frame_id in data.keys():
+        # Par défaut c'est 'air'
+        action = "air"
+        
+        # On vérifie si c'est un hit ou un bounce
+        if frame_id in hits:
+            action = "hit"
+        elif frame_id in bounces:
+            action = "bounce"
+            
+        data[frame_id]["pred_action"] = action
+        # Note: 'x', 'y' et 'visible' sont déjà présents dans 'data'
+
+    # ---------------------------------------------------------
+    # 8. VISUALISATION (DEBUG)
     # ---------------------------------------------------------
     plt.figure(figsize=(12, 6))
     plt.plot(frames, Y_smooth, color='blue', label='Trajectoire Y (Lissée)')
 
-    # Marquage des événements Hits
-    label_added_hit = False 
     for frame_hit in hits:
-        if not label_added_hit:
-            plt.axvline(x=frame_hit, color='green', linestyle='--', linewidth=1.5, label='Hit (Détecté)')
-            label_added_hit = True
-        else:
-            plt.axvline(x=frame_hit, color='green', linestyle='--', linewidth=1.5)
-
-    # Marquage des événements Bounces
-    label_added_bounce = False
+        plt.axvline(x=frame_hit, color='green', linestyle='--', linewidth=1.5, label='Hit' if frame_hit==hits[0] else "")
     for frame_bounce in bounces:
-        if not label_added_bounce:
-            plt.axvline(x=frame_bounce, color='red', linestyle='--', linewidth=1.5, label='Bounce (Détecté)')
-            label_added_bounce = True
-        else:
-            plt.axvline(x=frame_bounce, color='red', linestyle='--', linewidth=1.5)
+        plt.axvline(x=frame_bounce, color='red', linestyle='--', linewidth=1.5, label='Bounce' if frame_bounce==bounces[0] else "")
 
     plt.title(f"Analyse Physique : {os.path.basename(json_file_path)}")
     plt.xlabel("Index Frame")
@@ -247,8 +223,6 @@ def unsupervised_hit_bounce_detection(json_file_path):
     labels_ticks = [frames[i] for i in indices_ticks]
     plt.xticks(indices_ticks, labels_ticks, fontsize=8)
     plt.legend()
-    
-    
     plt.show()
 
     print(f"\n>>> RÉSULTATS ANALYSE PHYSIQUE")
@@ -256,7 +230,7 @@ def unsupervised_hit_bounce_detection(json_file_path):
     print(f"| Bounces : {len(bounces)}")
     print(f"{'='*60}\n")
     
-    return hits, bounces
+    return data
 
 
 
