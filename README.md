@@ -41,9 +41,7 @@ La classification repose sur des descripteurs cinématiques que j'ai conçus pou
 
 ----Détection des Frappes (Hits) :
 
-Inversion Vectorielle (Produit Scalaire < 0) : Je calcule le produit scalaire entre le vecteur vitesse entrant (t[-3:0]) et sortant (t[1:4])
-
-    ​-> Une valeur négative indique une rupture de direction > 90° (caractéristique d'un coup de raquette).
+Inversion Vectorielle (Produit Scalaire < 0) : Je calcule le produit scalaire entre le vecteur vitesse entrant (t[-3:0]) et sortant (t[1:4]) : une valeur négative indique une rupture de direction > 90° (caractéristique d'un coup de raquette).
 
 Magnitude d'Accélération : Un seuil de force (> 4g) est appliqué pour filtrer les mouvements passifs.
 
@@ -75,6 +73,7 @@ Gestion du Déséquilibre (Imbalance) : * Le jeu de tennis est composé à 95% d
 Utilisation de class_weight='balanced' dans le Random Forest pour pénaliser les erreurs sur les classes minoritaires (Hits/Bounces) et forcer le modèle à les apprendre.
 
  **Visualisation**
+ 
 Le module main.py inclut un moteur de rendu Matplotlib qui superpose les événements détectés à la trajectoire de profondeur (Y) pour validation visuelle :
 
 Lignes Vertes : Frappes (Hits) détectées par rupture de flux.
@@ -82,6 +81,7 @@ Lignes Vertes : Frappes (Hits) détectées par rupture de flux.
 Lignes Rouges : Rebonds (Bounces) détectés par signature verticale.
 
  **Structure du Projet**
+ 
 main.py : Pipeline d'inférence, algorithme physique et visualisation.
 
 train_model.py : Pipeline d'entraînement ML (Extraction de features, Split, Training, Validation).
