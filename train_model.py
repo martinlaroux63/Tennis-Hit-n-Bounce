@@ -164,7 +164,7 @@ if __name__ == "__main__":
     # --- C. MODÉLISATION ---
     print("\n Démarrage de l'entraînement (Random Forest)...")
     
-    # Utilisation de class_weight='balanced' :
+    # Utilisation de class_weight='custom_weight' :
     # Pénalise davantage les erreurs sur les classes minoritaires (Hit/Bounce) 
     # pour compenser la prédominance de la classe 'Air'.
     custom_weight={'hit':10,'bounce':10,'air':1}
