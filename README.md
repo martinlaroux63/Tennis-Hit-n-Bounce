@@ -70,7 +70,7 @@ Calcul de la variation angulaire pour détecter les cassures de trajectoire subt
 
 Gestion du Déséquilibre (Imbalance) : * Le jeu de tennis est composé à 95% de frames "Air" (rien ne se passe).
 
-Utilisation de class_weight='balanced' dans le Random Forest pour pénaliser les erreurs sur les classes minoritaires (Hits/Bounces) et forcer le modèle à les apprendre.
+Utilisation de class_weight=custom_weight dans le Random Forest pour pénaliser les erreurs sur les classes minoritaires (Hits/Bounces) et forcer le modèle à les apprendre.
 
  **Visualisation**
  
