@@ -167,7 +167,8 @@ if __name__ == "__main__":
     # Utilisation de class_weight='balanced' :
     # Pénalise davantage les erreurs sur les classes minoritaires (Hit/Bounce) 
     # pour compenser la prédominance de la classe 'Air'.
-    clf = RandomForestClassifier(n_estimators=100, class_weight='balanced', random_state=42, n_jobs=-1)
+    custom_weight={'hit':10,'bounce':10,'air':1}
+    clf = RandomForestClassifier(n_estimators=100, class_weight=custom_weight, random_state=42, n_jobs=-1)
     
     clf.fit(X_train, y_train)
     
