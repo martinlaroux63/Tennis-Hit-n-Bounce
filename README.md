@@ -21,13 +21,13 @@ L'architecture repose sur une approche hybride combinant une **analyse cinémati
 Le cœur du projet réside dans la traduction de données de position brutes (x,y) en signatures physiques interprétables.
 
 
-#1. Moteur Physique & Cinématique (Non-Supervisé)
+**1. Moteur Physique & Cinématique (Non-Supervisé)**
 
 Script : main.py
 
 Plutôt que de traiter les données comme une simple série temporelle, j'ai modélisé la balle comme un objet physique soumis à des forces. L'algorithme suit ce pipeline :
 
-  **A. Traitement du Signal (Signal Processing)**
+  #A. Traitement du Signal (Signal Processing)
 
 Les données brutes de tracking contiennent du bruit et des occlusions.
 
@@ -35,7 +35,7 @@ Interpolation Linéaire : Comblement des frames manquantes pour assurer la conti
 
 Filtre Savitzky-Golay : Contrairement à une moyenne mobile qui "écrase" les pics d'intensité, ce filtre (fenêtre de 7, polynôme d'ordre 2) lisse le bruit tout en préservant l'amplitude des impulsions (essentiel pour détecter la force réelle d'un impact).
 
- **B. Paramètres Physiques & Arbre de Décision**
+ #B. Paramètres Physiques & Arbre de Décision
 
 La classification repose sur des descripteurs cinématiques que j'ai conçus pour distinguer les signatures vectorielles :
 
@@ -58,7 +58,7 @@ Stabilité Latérale : Contrairement à une frappe, un rebond conserve la direct
 
 
 
-#2. Moteur Machine Learning (Supervisé)
+**2. Moteur Machine Learning (Supervisé)**
 
 Script : train_model.py et main.py
 
